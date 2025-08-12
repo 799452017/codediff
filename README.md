@@ -56,30 +56,32 @@ java -jar codediff-tool-1.0.0.jar <project1_path> <project2_path>
 java -jar codediff-tool-1.0.0.jar <project1_path> <project2_path> [options]
 ```
 
-可用选项：
-```
-  -t <阈值>     设置相似度阈值 (0.0-1.0) - 默认0.6
-  -w            忽略空白字符
-  -i            忽略大小写
-  -e <模式>     排除文件模式 (正则表达式)
-  -tree         显示树状结构
-  -diff-only    只显示有差异的部分
-  -side-by-side 并排对比显示（与-tree一起使用）
-```
+#### 命令行选项
 
-## 使用示例
+| 选项 | 说明 | 默认值                                   |
+|------|------|---------------------------------------|
+| `-t <阈值>` | 设置相似度阈值 (0.0-1.0) | 0.6                                   |
+| `-w` | 忽略空白字符 | true                                  |
+| `-i` | 忽略大小写 | true                                  |
+| `-e <模式>` | 排除文件模式 (正则表达式) | target/**、.idea/**、.mvn/**、.git/** |
+| `-tree` | 显示树状结构 | true                                  |
+| `-diff-only` | 只显示有差异的部分 | true                                  |
+| `-side-by-side` | 并排对比显示（与-tree一起使用） | true                                  |
 
-### 基本比较
+
+### 使用示例
+
+#### 基本比较
 ```bash
 java -jar code-diff-tool.jar /path/to/projectA /path/to/projectB
 ```
 
-### 高级比较（带树状结构）
+#### 高级比较（带树状结构）
 ```bash
 java -jar code-diff-tool.jar projectA projectB -tree -diff-only
 ```
 
-### 输出示例
+#### 输出示例
 
 ```
 ============ 源码对比结果摘要 ============
@@ -111,47 +113,10 @@ src                                            src
 ...
 ```
 
-# 源代码对比工具 - 完整使用指南
 
-## 作为独立工具使用
+### 作为Maven依赖使用
 
-### 构建与运行
-
-```bash
-# 克隆仓库
-git clone https://github.com/yourusername/code-diff-tool.git
-cd code-diff-tool
-
-# 使用Maven构建
-mvn clean package
-
-# 运行工具
-java -jar target/code-diff-tool-1.0.0-jar-with-dependencies.jar \
-    /path/to/project1 \
-    /path/to/project2 \
-    -t 0.7 \       # 设置相似度阈值为70%
-    -w \           # 忽略空白字符
-    -i \           # 忽略大小写
-    -e ".*\\.log" \ # 排除所有日志文件
-    -tree \        # 显示树状结构
-    -diff-only     # 只显示有差异的部分
-```
-
-### 命令行选项
-
-| 选项 | 说明 | 默认值                                   |
-|------|------|---------------------------------------|
-| `-t <阈值>` | 设置相似度阈值 (0.0-1.0) | 0.6                                   |
-| `-w` | 忽略空白字符 | true                                  |
-| `-i` | 忽略大小写 | true                                  |
-| `-e <模式>` | 排除文件模式 (正则表达式) | target/**、.idea/**、.mvn/**、.git/** |
-| `-tree` | 显示树状结构 | true                                  |
-| `-diff-only` | 只显示有差异的部分 | true                                  |
-| `-side-by-side` | 并排对比显示（与-tree一起使用） | true                                  |
-
-## 作为Maven依赖使用
-
-### 添加依赖
+#### 添加依赖
 
 ```xml
 <dependency>
@@ -161,7 +126,7 @@ java -jar target/code-diff-tool-1.0.0-jar-with-dependencies.jar \
 </dependency>
 ```
 
-### 基本使用示例
+#### 基本使用示例
 
 ```java
 import com.example.codediff.SourceCodeComparator;
@@ -195,7 +160,7 @@ public class BasicUsageExample {
 }
 ```
 
-### 生成树状结构报告
+#### 生成树状结构报告
 
 ```java
 import com.example.codediff.ResultReporter;
@@ -230,15 +195,15 @@ public class TreeReportExample {
 }
 ```
 
-## API参考摘要
+### API参考摘要
 
-### SourceCodeComparator 类
+#### SourceCodeComparator 类
 
 | 方法 | 说明 |
 |------|------|
 | `compareProjects(Path, Path)` | 比较两个工程 |
 
-### ComparatorConfig 类
+#### ComparatorConfig 类
 
 | 方法 | 说明 |
 |------|------|
@@ -247,7 +212,7 @@ public class TreeReportExample {
 | `setIgnoreCase(boolean)` | 设置是否忽略大小写 |
 | `addExcludePattern(String)` | 添加文件排除模式 |
 
-### ComparisonResult 类
+#### ComparisonResult 类
 
 | 方法 | 说明 |
 |------|------|
@@ -260,7 +225,7 @@ public class TreeReportExample {
 | `getDirectoryTree1()` | 获取工程1目录树 |
 | `getDirectoryTree2()` | 获取工程2目录树 |
 
-## 项目结构
+### 项目结构
 
 ```
 code-diff-tool/
