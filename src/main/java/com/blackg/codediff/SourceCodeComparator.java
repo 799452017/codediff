@@ -3,7 +3,6 @@ package com.blackg.codediff;
 import com.blackg.codediff.tree.DirectoryTree;
 import com.blackg.codediff.tree.TreeNode;
 import com.blackg.codediff.enums.MatchType;
-import com.blackg.codediff.enums.NodeType;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -106,6 +105,11 @@ public class SourceCodeComparator {
      * @return 对比结果
      */
     public ComparisonResult compareProjects(Path project1Path, Path project2Path) throws IOException {
+        //获取两个工程的大小
+        long fileSize1 = project1Path.toFile().length();
+        long fileSize2 = project2Path.toFile().length();
+        result.setFileSize1(fileSize1);
+        result.setFileSize2(fileSize2);
         // 收集两个工程的所有文件
         List<FileData> files1 = collectFiles(project1Path);
         List<FileData> files2 = collectFiles(project2Path);
@@ -361,6 +365,10 @@ public class SourceCodeComparator {
         if (!isBinary) {
             // 处理文件内容
             String contentStr = new String(content, StandardCharsets.UTF_8);
+            // 如果配置了排除注释，则进行注释处理
+            if (config.isIgnoreComments()) {
+                contentStr = CommentRemover.removeComments(contentStr, file.getFileName().toString());
+            }
             lines = Arrays.asList(contentStr.split("\\R"));
 
             // 应用预处理（如果需要）
@@ -412,7 +420,7 @@ public class SourceCodeComparator {
      * 行内容预处理
      */
     private List<String> preprocessLines(List<String> lines) {
-        return lines.stream()
+        List<String> processedLines = lines.stream()
                 .map(line -> {
                     String processed = line;
                     if (config.isIgnoreWhitespace()) {
@@ -424,6 +432,8 @@ public class SourceCodeComparator {
                     return processed;
                 })
                 .collect(Collectors.toList());
+
+        return processedLines;
     }
 
     /**

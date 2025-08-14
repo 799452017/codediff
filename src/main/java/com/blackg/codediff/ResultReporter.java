@@ -21,6 +21,10 @@ public class ResultReporter {
         out.println("\n============ 源码对比结果摘要 ============");
         out.printf("工程1文件总数: %d\n", result.getAllFiles1().size());
         out.printf("工程2文件总数: %d\n", result.getAllFiles2().size());
+        out.printf("工程1文件大小: %d 字节\n", result.getFileSize1());
+        out.printf("工程2文件大小: %d 字节\n", result.getFileSize2());
+        out.printf("工程1代码行数: %d\n", result.getCodeCount1());
+        out.printf("工程2代码行数: %d\n", result.getCodeCount2());
         out.println("----------------------------------------");
         out.printf("完全匹配文件数: %d\n", result.getExactMatchCount());
         out.printf("部分匹配文件数: %d\n", result.getDiffMatchCount());

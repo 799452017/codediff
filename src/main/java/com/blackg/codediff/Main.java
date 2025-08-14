@@ -1,6 +1,5 @@
 package com.blackg.codediff;
 
-import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -10,13 +9,14 @@ public class Main {
         if (args.length < 2) {
             System.out.println("用法: java SourceCodeComparator <工程1路径> <工程2路径> [选项]");
             System.out.println("选项:");
-            System.out.println("  -t <阈值>     设置相似度阈值 (0.0-1.0)");
-            System.out.println("  -w            忽略空白字符");
-            System.out.println("  -i            忽略大小写");
-            System.out.println("  -e <模式>      排除文件模式 (通配符)");
-            System.out.println("  -tree          显示树状结构");
-            System.out.println("  -diff-only     只显示有差异的部分");
-            System.out.println("  -side-by-side  并排对比显示（与-tree一起使用）");
+            System.out.println("  -t <阈值>         设置相似度阈值 (0.0-1.0)");
+            System.out.println("  -w                忽略空白字符");
+            System.out.println("  -i                忽略大小写");
+            System.out.println("  -e <模式>          排除文件模式 (通配符)");
+            System.out.println("  -tree             显示树状结构");
+            System.out.println("  -diff-only        只显示有差异的部分");
+            System.out.println("  -side-by-side     并排对比显示（与-tree一起使用）");
+            System.out.println("  -ignore-comments  忽略代码注解");
 //            return;
         }
 
@@ -52,6 +52,9 @@ public class Main {
                     break;
                 case "-side-by-side":
                     config.setShowSideBySide(true);
+                    break;
+                case "-ignore-comments":
+                    config.setIgnoreComments(true);
                     break;
             }
         }

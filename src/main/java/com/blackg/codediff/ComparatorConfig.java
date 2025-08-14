@@ -15,8 +15,9 @@ public class ComparatorConfig {
     private boolean ignoreCase = false;       // 是否忽略大小写
     private List<String> excludePatterns = new ArrayList<>(); // 排除文件模式
     private boolean showTree = true;
-    private boolean showOnlyDiff = true;
+    private boolean showOnlyDiff = false;
     private boolean showSideBySide = true;
+    private boolean ignoreComments = false;
 
     public ComparatorConfig() {
         excludePatterns.add("target/**");
@@ -58,6 +59,11 @@ public class ComparatorConfig {
 
     public ComparatorConfig setShowSideBySide(boolean showSideBySide) {
         this.showSideBySide = showSideBySide;
+        return this;
+    }
+
+    public ComparatorConfig setIgnoreComments(boolean ignoreComments) {
+        this.ignoreComments = ignoreComments;
         return this;
     }
 }

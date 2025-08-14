@@ -2,7 +2,6 @@ package com.blackg.codediff;
 
 import lombok.Data;
 
-import java.io.File;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -27,5 +26,9 @@ public class FileData {
         this.isBinary = isBinary;
         this.fileSize = fileSize;
         this.parentDir = parentDir;
+    }
+
+    public int getLineCount() {
+        return lines.size();
     }
 }
