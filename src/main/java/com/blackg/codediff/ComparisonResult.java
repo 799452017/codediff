@@ -22,6 +22,9 @@ public class ComparisonResult {
     private long fileSize1 = 0L;
     private long fileSize2 = 0L;
 
+    private String fileName1;
+    private String fileName2;
+
     // 获取完全匹配文件数量
     public int getExactMatchCount() {
         return exactMatches.size();
@@ -93,6 +96,27 @@ public class ComparisonResult {
     // 获取工程2代码行数
     public int getCodeCount2() {
         return getAllFiles2().stream().mapToInt(FileData::getLineCount).sum();
+    }
+
+    public static String getFileSizeName(long fileSize){
+        //根据大小返回KM, G
+        if (fileSize < 1024) {
+            return fileSize + "B";
+        }
+        if (fileSize < 1024 * 1024) {
+            return String.format("%.2fKB", fileSize / 1024.0);
+        }
+        if (fileSize < 1024 * 1024 * 1024) {
+            return String.format("%.2fMB", fileSize / (1024.0 * 1024.0));
+        }
+        return String.format("%.2fGB", fileSize / (1024.0 * 1024.0 * 1024.0));
+    }
+
+    public String getFileSizeName1(){
+        return getFileSizeName(fileSize1);
+    }
+    public String getFileSizeName2(){
+        return getFileSizeName(fileSize2);
     }
 
 }

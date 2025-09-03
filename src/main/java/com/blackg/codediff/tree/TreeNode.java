@@ -1,11 +1,12 @@
 package com.blackg.codediff.tree;
 
+import com.alibaba.fastjson.annotation.JSONField;
 import com.blackg.codediff.FileData;
 import com.blackg.codediff.FileMatch;
 import com.blackg.codediff.enums.NodeType;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -13,10 +14,19 @@ import java.util.Map;
 
 @Data
 public class TreeNode {
+    private String id;
     private final String name;
     private final NodeType type;
-    private final Path fullPath;
+//    @JsonIgnore //忽略jackson序列化
+//    @JSONField(serialize = false) //忽略fastjson序列化
+    private final String fullPath;
+//    @JsonIgnore //忽略jackson序列化
+//    @JSONField(serialize = false) //忽略fastjson序列化
+    private final String relativePath;
+    private final String md5;
     private final Map<String, TreeNode> children = new HashMap<>();
+    @JsonIgnore //忽略jackson序列化
+    @JSONField(serialize = false) //忽略fastjson序列化
     private TreeNode parent;
     private boolean root = false;
 
@@ -24,10 +34,12 @@ public class TreeNode {
     private FileData fileData;
     private FileMatch fileMatch;
 
-    public TreeNode(String name, NodeType type, Path fullPath) {
+    public TreeNode(String name, NodeType type, String fullPath, String relativePath, String md5) {
         this.name = name;
         this.type = type;
         this.fullPath = fullPath;
+        this.relativePath = relativePath;
+        this.md5 = md5;
     }
 
     public void addChild(TreeNode node) {
@@ -35,6 +47,8 @@ public class TreeNode {
         children.put(node.name, node);
     }
 
+    @JsonIgnore //忽略jackson序列化
+    @JSONField(serialize = false) //忽略fastjson序列化
     public TreeNode getChild(String name) {
         return children.get(name);
     }
@@ -43,6 +57,8 @@ public class TreeNode {
     /**
      * 获取排序后的子节点列表
      */
+    @JsonIgnore //忽略jackson序列化
+    @JSONField(serialize = false) //忽略fastjson序列化
     public List<TreeNode> getSortedChildren() {
         List<TreeNode> children = new ArrayList<>(this.children.values());
 

@@ -4,6 +4,7 @@ import com.blackg.codediff.FileData;
 import com.blackg.codediff.enums.NodeType;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,7 +18,7 @@ public class DirectoryTree {
 
     public DirectoryTree(Path basePath) {
         this.basePath = basePath;
-        this.root = new TreeNode("", NodeType.DIRECTORY, basePath);
+        this.root = new TreeNode("", NodeType.DIRECTORY, basePath.toString(), basePath.getFileName().toString(), "");
         this.root.setRoot(true);
     }
 
@@ -47,24 +48,25 @@ public class DirectoryTree {
                 boolean isDir = !parentPath.equals(fileData.getFilePath());
                 NodeType type = isDir ? NodeType.DIRECTORY : NodeType.FILE;
 
-                child = new TreeNode(name, type, parentPath);
+                child = new TreeNode(name, type, parentPath.toString(), relativePath.toString(), fileData.getMd5());
+                child.setId(fileData.getId());
                 current.addChild(child);
             }
 
             current = child;
-            parentPath = current.getFullPath();
+            parentPath = Paths.get(current.getFullPath());
         }
 
         // 设置文件数据
-        if (current.getType() == NodeType.FILE) {
-            current.setFileData(fileData);
-        }
+//        if (current.getType() == NodeType.FILE) {
+//            current.setFileData(fileData);
+//        }
     }
 
     /**
      * 获取树中所有文件节点
      */
-    public List<TreeNode> getAllFileNodes() {
+    public List<TreeNode> fileNodes() {
         List<TreeNode> fileNodes = new ArrayList<>();
         traverseTree(root, node -> {
             if (node.getType() == NodeType.FILE) {

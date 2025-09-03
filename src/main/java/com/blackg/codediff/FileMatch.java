@@ -1,10 +1,12 @@
 package com.blackg.codediff;
 
 import com.blackg.codediff.enums.MatchType;
+import lombok.Data;
 
 /**
  * 文件匹配结果
  */
+@Data
 public class FileMatch {
     final FileData file1;
     final FileData file2;

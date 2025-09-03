@@ -1,13 +1,20 @@
 package com.blackg.codediff;
 
+import com.alibaba.fastjson.JSONObject;
+import com.blackg.codediff.enums.MatchType;
 import com.blackg.codediff.tree.DirectoryTree;
 import com.blackg.codediff.tree.TreeNode;
-import com.blackg.codediff.enums.MatchType;
+import lombok.Data;
+import lombok.SneakyThrows;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
-import java.security.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -15,6 +22,7 @@ import java.util.stream.Stream;
 /**
  * 源代码对比工具类，用于分析两个源码工程之间的相似性
  */
+@Data
 public class SourceCodeComparator {
 
     // 配置参数
@@ -42,7 +50,7 @@ public class SourceCodeComparator {
     /**
      * 构建工程目录树
      */
-    private DirectoryTree buildDirectoryTree(Path projectPath, List<FileData> files) {
+    public static DirectoryTree buildDirectoryTree(Path projectPath, List<FileData> files) {
         DirectoryTree tree = new DirectoryTree(projectPath);
         for (FileData file : files) {
             tree.addFile(file);
@@ -97,23 +105,17 @@ public class SourceCodeComparator {
         return current;
     }
 
-    /**
-     * 执行源码工程对比
-     *
-     * @param project1Path 工程1路径
-     * @param project2Path 工程2路径
-     * @return 对比结果
-     */
-    public ComparisonResult compareProjects(Path project1Path, Path project2Path) throws IOException {
+    public ComparisonResult compareProjects(List<FileData> files1, List<FileData> files2) {
+        Path basePath1 = files1.get(0).getBasePath();
+        Path basePath2 = files2.get(0).getBasePath();
         //获取两个工程的大小
-        long fileSize1 = project1Path.toFile().length();
-        long fileSize2 = project2Path.toFile().length();
+        long fileSize1 = basePath1.toFile().length();
+        long fileSize2 = basePath2.toFile().length();
         result.setFileSize1(fileSize1);
         result.setFileSize2(fileSize2);
-        // 收集两个工程的所有文件
-        List<FileData> files1 = collectFiles(project1Path);
-        List<FileData> files2 = collectFiles(project2Path);
-
+        //获取两个工程文件名称
+        result.setFileName1(basePath1.getFileName().toString());
+        result.setFileName2(basePath2.getFileName().toString());
         // 初始化未匹配文件集合
         result.getUnmatched1().addAll(files1);
         result.getUnmatched2().addAll(files2);
@@ -127,16 +129,33 @@ public class SourceCodeComparator {
         calculateOverallSimilarity();
 
         // 构建目录树
-        DirectoryTree tree1 = buildDirectoryTree(project1Path, files1);
-        DirectoryTree tree2 = buildDirectoryTree(project2Path, files2);
+        if (config.isShowTree()) {
+            DirectoryTree tree1 = buildDirectoryTree(basePath1, files1);
+            DirectoryTree tree2 = buildDirectoryTree(basePath2, files2);
 
-        // 应用匹配结果到树
-        applyMatchesToTrees(tree1, tree2, result);
+            // 应用匹配结果到树
+            applyMatchesToTrees(tree1, tree2, result);
 
-        // 将树添加到结果
-        result.setDirectoryTree1(tree1);
-        result.setDirectoryTree2(tree2);
+            // 将树添加到结果
+            result.setDirectoryTree1(tree1);
+            result.setDirectoryTree2(tree2);
+        }
         return result;
+    }
+
+    /**
+     * 执行源码工程对比
+     *
+     * @param project1Path 工程1路径
+     * @param project2Path 工程2路径
+     * @return 对比结果
+     */
+    public ComparisonResult compareProjects(Path project1Path, Path project2Path) {
+        // 收集两个工程的所有文件
+        List<FileData> files1 = collectFiles(project1Path);
+        List<FileData> files2 = collectFiles(project2Path);
+
+        return compareProjects(files1, files2);
     }
 
     /**
@@ -210,7 +229,6 @@ public class SourceCodeComparator {
         // 遍历所有可能的文件对
         for (Iterator<FileData> it1 = unmatched1.iterator(); it1.hasNext(); ) {
             FileData file1 = it1.next();
-            double maxSimilarity = 0;
             FileMatch bestMatch = null;
 
             for (Iterator<FileData> it2 = unmatched2.iterator(); it2.hasNext(); ) {
@@ -219,9 +237,7 @@ public class SourceCodeComparator {
                 // 计算相似度
                 double similarity = calculateSimilarity(file1, file2);
 
-                // 找到满足阈值的最佳匹配
-                if (similarity >= config.getSimilarityThreshold() && similarity > maxSimilarity) {
-                    maxSimilarity = similarity;
+                if (similarity >= config.getSimilarityThreshold()) {
                     bestMatch = new FileMatch(file1, file2, MatchType.CONTENT_MATCH, similarity);
                 }
             }
@@ -313,7 +329,8 @@ public class SourceCodeComparator {
     /**
      * 收集工程目录下的所有文件
      */
-    private List<FileData> collectFiles(Path projectPath) throws IOException {
+    @SneakyThrows
+    public List<FileData> collectFiles(Path projectPath) {
         List<FileData> files = new ArrayList<>();
 
         // 递归遍历目录
@@ -378,7 +395,7 @@ public class SourceCodeComparator {
         }
 
         File file1 = file.toFile();
-        return new FileData(file, relativePath, md5, lines, isBinary, file1.length(), file.getParent());
+        return new FileData(projectPath, file, relativePath, md5, lines, isBinary, file1.length(), file.getParent());
     }
 
     public static boolean isTextFile(Path filePath) throws IOException {
@@ -510,6 +527,12 @@ public class SourceCodeComparator {
         return (2.0 * lcs) / (m + n);
     }
 
+    public static void main(String[] args) {
+        SourceCodeComparator comparator = new SourceCodeComparator();
+        ComparisonResult result = comparator.compareProjects(Paths.get("/Users/chenwenzhe/git/codediff")
+                , Paths.get("/Users/chenwenzhe/git/easy-ai"));
 
+        System.out.println(JSONObject.toJSONString(result.getDirectoryTree1()));
+    }
 
 }
