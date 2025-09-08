@@ -16,16 +16,18 @@ public class ComparatorConfig {
     private List<String> excludePatterns = new ArrayList<>(); // 排除文件模式
     private boolean ignoreComments = true; //是否忽略注释
     private boolean showTree = true;
-    private boolean showOnlyDiff = false;
+    private boolean showOnlyDiff = true;
     private boolean showSideBySide = true;
 
     public ComparatorConfig() {
-        excludePatterns.add("target/**");
-        excludePatterns.add(".svn/**");
-        excludePatterns.add(".idea/**");
-        excludePatterns.add(".mvn/**");
-        excludePatterns.add(".git/**");
-        excludePatterns.add("__MACOSX/**");
+        excludePatterns.add("**/target/**");
+        excludePatterns.add("**/.svn/**");
+        excludePatterns.add("**/.idea/**");
+        excludePatterns.add("**/.mvn/**");
+        excludePatterns.add("**/.git/**");
+        excludePatterns.add("**/__MACOSX/**");
+        excludePatterns.add("**/**.svg");
+        excludePatterns.add("node_modules/**");
 
     }
 

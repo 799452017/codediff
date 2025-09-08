@@ -1,5 +1,6 @@
 package com.blackg.codediff;
 
+import cn.hutool.core.io.FileUtil;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -16,8 +17,8 @@ import java.util.List;
 public class FileData {
     String id;
     String fileName;
-    final Path basePath;
-    final Path filePath;          // 文件绝对路径
+    final String basePath;
+    final String filePath;          // 文件绝对路径
     final String relativePath;    // 相对于工程根目录的相对路径
     final String md5;             // 文件内容的MD5值
     final List<String> lines;     // 文件内容行列表
@@ -25,10 +26,10 @@ public class FileData {
     final long fileSize;
     final Path parentDir;
 
-    public FileData(Path basePath, Path filePath, String relativePath, String md5, List<String> lines, boolean isBinary, long fileSize, Path parentDir) {
+    public FileData(String basePath, String filePath, String relativePath, String md5, List<String> lines, boolean isBinary, long fileSize, Path parentDir) {
         this.basePath = basePath;
         this.filePath = filePath;
-        this.fileName = filePath.getFileName().toString();
+        this.fileName = FileUtil.getName(filePath);;
         this.relativePath = relativePath;
         this.md5 = md5;
         this.lines = lines;

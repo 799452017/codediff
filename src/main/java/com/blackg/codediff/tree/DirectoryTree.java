@@ -18,7 +18,7 @@ public class DirectoryTree {
 
     public DirectoryTree(Path basePath) {
         this.basePath = basePath;
-        this.root = new TreeNode("", NodeType.DIRECTORY, basePath.toString(), basePath.getFileName().toString(), "");
+        this.root = new TreeNode("", basePath.toFile().isDirectory() ? NodeType.DIRECTORY : NodeType.FILE, basePath.toString(), basePath.getFileName().toString(), "");
         this.root.setRoot(true);
     }
 
@@ -34,7 +34,8 @@ public class DirectoryTree {
      * 添加文件到树结构中
      */
     public void addFile(FileData fileData) {
-        Path relativePath = basePath.relativize(fileData.getFilePath());
+        Path filePath = Paths.get(fileData.getFilePath());
+        Path relativePath = basePath.relativize(filePath);
         TreeNode current = root;
 
         // 遍历路径组件
@@ -45,7 +46,7 @@ public class DirectoryTree {
 
             if (child == null) {
                 parentPath = parentPath.resolve(name);
-                boolean isDir = !parentPath.equals(fileData.getFilePath());
+                boolean isDir = filePath.toFile().isDirectory();
                 NodeType type = isDir ? NodeType.DIRECTORY : NodeType.FILE;
 
                 child = new TreeNode(name, type, parentPath.toString(), relativePath.toString(), fileData.getMd5());

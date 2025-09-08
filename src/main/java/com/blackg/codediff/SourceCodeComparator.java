@@ -1,7 +1,9 @@
 package com.blackg.codediff;
 
-import com.alibaba.fastjson.JSONObject;
+import cn.hutool.core.io.FileUtil;
 import com.blackg.codediff.enums.MatchType;
+import com.blackg.codediff.listener.DefaultProgressListener;
+import com.blackg.codediff.listener.ProgressListener;
 import com.blackg.codediff.tree.DirectoryTree;
 import com.blackg.codediff.tree.TreeNode;
 import lombok.Data;
@@ -31,6 +33,8 @@ public class SourceCodeComparator {
     // 对比结果
     private final ComparisonResult result = new ComparisonResult();
 
+    private ProgressListener progressListener;
+
     /**
      * 构造函数
      *
@@ -46,6 +50,31 @@ public class SourceCodeComparator {
     public SourceCodeComparator() {
         this(new ComparatorConfig());
     }
+
+    private void notifyProgress(int phase, int totalPhases, String phaseName, double progress) {
+        if (progressListener != null) {
+            progressListener.onProgress(phase, totalPhases, phaseName, progress);
+        }
+    }
+
+    private void notifyFileProgress(String fileName, int current, int total, double similarity) {
+        if (progressListener != null) {
+            progressListener.onFileProgress(fileName, current, total, similarity);
+        }
+    }
+
+    private void notifyPhaseStart(int phase, int totalPhases, String phaseName, int fileCount) {
+        if (progressListener != null) {
+            progressListener.onPhaseStart(phase, totalPhases, phaseName, fileCount);
+        }
+    }
+
+    private void notifyPhaseComplete(int phase, int totalPhases, String phaseName, long matchedFiles) {
+        if (progressListener != null) {
+            progressListener.onPhaseComplete(phase, totalPhases, phaseName, (int) matchedFiles);
+        }
+    }
+
 
     /**
      * 构建工程目录树
@@ -106,8 +135,12 @@ public class SourceCodeComparator {
     }
 
     public ComparisonResult compareProjects(List<FileData> files1, List<FileData> files2) {
-        Path basePath1 = files1.get(0).getBasePath();
-        Path basePath2 = files2.get(0).getBasePath();
+        final int TOTAL_PHASES = 6;
+        int currentPhase = 1;
+
+        notifyProgress(currentPhase++, TOTAL_PHASES, "准备开始对比", 0.1);
+        Path basePath1 = Paths.get(files1.get(0).getBasePath());
+        Path basePath2 = Paths.get(files2.get(0).getBasePath());
         //获取两个工程的大小
         long fileSize1 = basePath1.toFile().length();
         long fileSize2 = basePath2.toFile().length();
@@ -121,15 +154,26 @@ public class SourceCodeComparator {
         result.getUnmatched2().addAll(files2);
 
         // 执行多阶段匹配
-        matchByMD5();
-        matchByNameAndContent();
-        matchByContentSimilarity();
+        notifyPhaseStart(currentPhase, TOTAL_PHASES, "MD5匹配", files1.size());
+        long matchByMD5 = matchByMD5();
+        notifyPhaseComplete(currentPhase++, TOTAL_PHASES, "MD5匹配", matchByMD5);
+
+        notifyPhaseStart(currentPhase, TOTAL_PHASES, "文件名匹配", result.getUnmatched1().size());
+        long matchByNameAndContent = matchByNameAndContent();
+        notifyPhaseComplete(currentPhase++, TOTAL_PHASES, "文件名匹配", matchByNameAndContent);
+
+        notifyPhaseStart(currentPhase, TOTAL_PHASES, "内容相似度匹配", result.getUnmatched1().size());
+        long matchByContentSimilarity = matchByContentSimilarity();
+        notifyPhaseComplete(currentPhase++, TOTAL_PHASES, "内容相似度匹配", matchByContentSimilarity);
 
         // 计算整体相似度
+        notifyPhaseStart(currentPhase, TOTAL_PHASES, "计算相似度", result.getUnmatched1().size());
         calculateOverallSimilarity();
+        notifyPhaseComplete(currentPhase++, TOTAL_PHASES, "计算相似度", result.getUnmatched1().size());
 
         // 构建目录树
         if (config.isShowTree()) {
+            notifyPhaseStart(currentPhase, TOTAL_PHASES, "构建目录树", files1.size() + files2.size());
             DirectoryTree tree1 = buildDirectoryTree(basePath1, files1);
             DirectoryTree tree2 = buildDirectoryTree(basePath2, files2);
 
@@ -139,7 +183,10 @@ public class SourceCodeComparator {
             // 将树添加到结果
             result.setDirectoryTree1(tree1);
             result.setDirectoryTree2(tree2);
+            notifyPhaseComplete(currentPhase, TOTAL_PHASES, "构建目录树", 0);
         }
+
+        notifyProgress(TOTAL_PHASES, TOTAL_PHASES, "对比完成", 1);
         return result;
     }
 
@@ -161,22 +208,26 @@ public class SourceCodeComparator {
     /**
      * 第一阶段匹配：通过MD5值匹配完全相同的文件
      */
-    private void matchByMD5() {
+    private long matchByMD5() {
         // 创建MD5到文件的映射
         //根据md5值分组
         Set<FileData> files1 = result.getUnmatched1();
         Set<FileData> files2 = result.getUnmatched2();
         Map<String, FileData> md5Map1 = createMD5Map(files1);
         Map<String, FileData> md5Map2 = createMD5Map(files2);
+        int size = md5Map1.size();
 
+        int matchCount = 0;
+        int currentFile = 0;
         // 遍历所有MD5值，寻找匹配项
         for (Map.Entry<String, FileData> entry : md5Map1.entrySet()) {
             String md5 = entry.getKey();
             FileData file1 = entry.getValue();
 
-            if (md5Map2.containsKey(md5)) {
-                FileData file2 = md5Map2.get(md5);
-
+            double similarity = 0;
+            FileData file2 = md5Map2.get(md5);
+            if (file2 != null) {
+                similarity = 1.0;
                 // 创建匹配记录
                 FileMatch match = new FileMatch(file1, file2, MatchType.EXACT_MATCH, 1.0);
                 result.addExactMatch(match);
@@ -184,73 +235,121 @@ public class SourceCodeComparator {
                 // 从未匹配集合中移除
                 files1.remove(file1);
                 result.getUnmatched2().remove(file2);
+
+                matchCount++;
+            }
+
+            // 通知文件处理进度
+            currentFile++;
+            if (file2 != null) {
+                notifyFileProgress(file1.getRelativePath() + " <> " + file2.getRelativePath(), currentFile, size, similarity);
+            } else {
+                notifyFileProgress(file1.getRelativePath(), currentFile, size, similarity);
             }
         }
+
+        return matchCount;
     }
 
     /**
      * 第二阶段匹配：匹配同名文件并计算相似度
      */
-    private void matchByNameAndContent() {
+    private long matchByNameAndContent() {
         // 创建相对路径到文件的映射
-        Map<String, FileData> pathMap2 = result.getUnmatched2().stream()
-                .collect(Collectors.toMap(f -> f.relativePath, f -> f));
+        Map<String, List<FileData>> pathMap2 = result.getUnmatched2().stream()
+                .collect(Collectors.groupingBy(FileData::getFileName));
+        int size = result.getUnmatched1().size();
 
+        int matchCount = 0;
+        int currentFile = 0;
         // 遍历工程1未匹配文件
         for (Iterator<FileData> it = result.getUnmatched1().iterator(); it.hasNext(); ) {
             FileData file1 = it.next();
-            FileData file2 = pathMap2.get(file1.relativePath);
+            List<FileData> file2s = pathMap2.get(file1.getFileName());
+            currentFile++;
+            if (file2s == null) {
+                notifyFileProgress(file1.getRelativePath(), currentFile, size, 0);
+                continue;
+            }
 
-            if (file2 != null && result.getUnmatched2().contains(file2)) {
+            // 通知文件处理进度
+            boolean matched = false;
+            double similarity = 0;
+            for (FileData file2 : file2s) {
+                if (!result.getUnmatched2().contains(file2)) {
+                    notifyFileProgress(file1.getRelativePath() + " <> " + file2.getRelativePath(), currentFile, size, 0);
+                    continue;
+                }
                 // 计算相似度
-                double similarity = calculateSimilarity(file1, file2);
+                similarity = calculateSimilarity(file1, file2);
+                notifyFileProgress(file1.getRelativePath() + " <> " + file2.getRelativePath(), currentFile, size, similarity);
 
-                if (similarity >= config.getSimilarityThreshold()) { // MD5不同所以一定<1
+                if (similarity >= config.getSimilarityThreshold()) {
                     // 创建匹配记录
                     FileMatch match = new FileMatch(file1, file2, MatchType.NAME_MATCH, similarity);
                     result.addDiffMatch(match);
-
-                    // 从未匹配集合中移除
-                    it.remove();
                     result.getUnmatched2().remove(file2);
+
+                    matched = true;
+                    matchCount++;
                 }
             }
+
+            if (matched) {
+                // 从未匹配集合中移除
+                it.remove();
+            }
+
         }
+        return matchCount;
     }
 
     /**
      * 第三阶段匹配：通过内容相似度匹配文件
      */
-    private void matchByContentSimilarity() {
-        // 为未匹配文件创建索引
-        List<FileData> unmatched1 = new ArrayList<>(result.getUnmatched1());
-        List<FileData> unmatched2 = new ArrayList<>(result.getUnmatched2());
+    private long matchByContentSimilarity() {
+        int total = result.getUnmatched1().size() * result.getUnmatched2().size();
 
-        // 遍历所有可能的文件对
-        for (Iterator<FileData> it1 = unmatched1.iterator(); it1.hasNext(); ) {
-            FileData file1 = it1.next();
+        int matchCount = 0;
+        int currentFile = 0;
+        List<FileData> matched2 = new ArrayList<>();
+        for (Iterator<FileData> it = result.getUnmatched1().iterator(); it.hasNext(); ) {
+            FileData file1 = it.next();
+            String suffix1 = FileUtil.getSuffix(file1.getFileName());
             FileMatch bestMatch = null;
 
-            for (Iterator<FileData> it2 = unmatched2.iterator(); it2.hasNext(); ) {
-                FileData file2 = it2.next();
+            for (FileData file2 : result.getUnmatched2()) {
+                String suffix2 = FileUtil.getSuffix(file2.getFileName());
 
-                // 计算相似度
-                double similarity = calculateSimilarity(file1, file2);
+                double similarity = 0;
+                if (suffix1.equals(suffix2)) {
+                    similarity = calculateSimilarity(file1, file2);
+                    if (similarity >= getConfig().getSimilarityThreshold()) {
+                        bestMatch = new FileMatch(file1, file2, MatchType.CONTENT_MATCH, similarity);
+                        //手动存一下匹配过得文件，不立刻移除，不然后续匹配无法进行
+                        matched2.add(file2);
+                        result.addDiffMatch(bestMatch);
 
-                if (similarity >= config.getSimilarityThreshold()) {
-                    bestMatch = new FileMatch(file1, file2, MatchType.CONTENT_MATCH, similarity);
+                        matchCount++;
+                    }
                 }
+                // 通知文件处理进度
+                currentFile++;
+                notifyFileProgress(file1.getRelativePath() + " <> " + file2.getRelativePath(), currentFile, total, similarity);
             }
 
-            // 处理找到的最佳匹配
+            //如果有任意匹配，则移除文件1未匹配列表
             if (bestMatch != null) {
-                result.addDiffMatch(bestMatch);
-                it1.remove();
-                unmatched2.remove(bestMatch.file2);
-                result.getUnmatched1().remove(bestMatch.file1);
-                result.getUnmatched2().remove(bestMatch.file2);
+                it.remove();
             }
         }
+
+        //手动移除所有已匹配文件
+        for (FileData file2 : matched2) {
+            result.getUnmatched2().remove(file2);
+        }
+
+        return matchCount;
     }
 
     /**
@@ -363,12 +462,12 @@ public class SourceCodeComparator {
     /**
      * 处理单个文件：计算MD5并读取内容
      */
-    private FileData processFile(Path file, Path projectPath) throws IOException, NoSuchAlgorithmException {
+    private FileData processFile(Path filePath, Path projectPath) throws IOException, NoSuchAlgorithmException {
         // 计算相对路径
-        String relativePath = projectPath.relativize(file).toString();
+        String relativePath = projectPath.relativize(filePath).toString();
 
         // 读取文件内容
-        byte[] content = Files.readAllBytes(file);
+        byte[] content = Files.readAllBytes(filePath);
 
         // 计算MD5
         String md5 = calculateMD5(content);
@@ -376,7 +475,7 @@ public class SourceCodeComparator {
         List<String> lines = new ArrayList<>();
 
         //判断文件是否是二进制文件
-        boolean isBinary = !isTextFile(file);
+        boolean isBinary = !isTextFile(filePath);
 
         // 只有文本文件才处理行内容
         if (!isBinary) {
@@ -384,7 +483,7 @@ public class SourceCodeComparator {
             String contentStr = new String(content, StandardCharsets.UTF_8);
             // 如果配置了排除注释，则进行注释处理
             if (config.isIgnoreComments()) {
-                contentStr = CommentRemover.removeComments(contentStr, file.getFileName().toString());
+                contentStr = CommentRemover.removeComments(contentStr, filePath.getFileName().toString());
             }
             lines = Arrays.asList(contentStr.split("\\R"));
 
@@ -394,8 +493,8 @@ public class SourceCodeComparator {
             }
         }
 
-        File file1 = file.toFile();
-        return new FileData(projectPath, file, relativePath, md5, lines, isBinary, file1.length(), file.getParent());
+        File file1 = filePath.toFile();
+        return new FileData(projectPath.toString(), filePath.toString(), relativePath, md5, lines, isBinary, file1.length(), filePath.getParent());
     }
 
     public static boolean isTextFile(Path filePath) throws IOException {
@@ -483,17 +582,54 @@ public class SourceCodeComparator {
      * 计算两个文件内容之间的相似度
      * 使用基于最长公共子序列（LCS）的相似度算法
      */
+//    private double calculateSimilarity(FileData fileData1, FileData fileData2) {
+//        if (fileData1.isBinary && fileData2.isBinary) {
+//            if (fileData1.md5.equals(fileData2.md5)) {
+//                //如果都是二进制文件，并且md5相同
+//                return 1.0;
+//            }
+//            return 0.0;
+//        }
+//
+//        if (fileData1.isBinary || fileData2.isBinary) {
+//            //如果有一个文件是二进制文件，则直接返回0.0
+//            return 0.0;
+//        }
+//
+//        List<String> lines1 = fileData1.lines;
+//        List<String> lines2 = fileData2.lines;
+//        int m = lines1.size();
+//        int n = lines2.size();
+//
+//        // 处理空文件情况
+//        if (m == 0 && n == 0) {
+//            return 1.0;
+//        }
+//        if (m == 0 || n == 0) return 0.0;
+//
+//        // 创建DP表计算LCS
+//        int[][] dp = new int[m + 1][n + 1];
+//
+//        for (int i = 1; i <= m; i++) {
+//            for (int j = 1; j <= n; j++) {
+//                if (lines1.get(i - 1).equals(lines2.get(j - 1))) {
+//                    dp[i][j] = dp[i - 1][j - 1] + 1;
+//                } else {
+//                    dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+//                }
+//            }
+//        }
+//
+//        int lcs = dp[m][n];
+//
+//        // 使用Dice系数计算相似度：2 * |A∩B| / (|A| + |B|)
+//        return (2.0 * lcs) / (m + n);
+//    }
     private double calculateSimilarity(FileData fileData1, FileData fileData2) {
         if (fileData1.isBinary && fileData2.isBinary) {
-            if (fileData1.md5.equals(fileData2.md5)) {
-                //如果都是二进制文件，并且md5相同
-                return 1.0;
-            }
-            return 0.0;
+            return fileData1.md5.equals(fileData2.md5) ? 1.0 : 0.0;
         }
-
         if (fileData1.isBinary || fileData2.isBinary) {
-            //如果有一个文件是二进制文件，则直接返回0.0
             return 0.0;
         }
 
@@ -502,37 +638,46 @@ public class SourceCodeComparator {
         int m = lines1.size();
         int n = lines2.size();
 
-        // 处理空文件情况
-        if (m == 0 && n == 0) {
-            return 1.0;
-        }
+        if (m == 0 && n == 0) return 1.0;
         if (m == 0 || n == 0) return 0.0;
 
-        // 创建DP表计算LCS
-        int[][] dp = new int[m + 1][n + 1];
+        // 确保 lines2 是较短的文件（优化空间）
+        if (m < n) {
+            // 交换 lines1/lines2 和 m/n
+            List<String> tempLines = lines1;
+            lines1 = lines2;
+            lines2 = tempLines;
+            int temp = m;
+            m = n;
+            n = temp;
+        }
 
+        // 使用单维数组 + 滚动变量（空间复杂度 O(n)）
+        int[] dp = new int[n + 1];
         for (int i = 1; i <= m; i++) {
+            int prevDiagonal = 0; // 保存左上角的值（dp[i-1][j-1]）
             for (int j = 1; j <= n; j++) {
+                int temp = dp[j]; // 保存当前值（下一轮成为 prevDiagonal）
                 if (lines1.get(i - 1).equals(lines2.get(j - 1))) {
-                    dp[i][j] = dp[i - 1][j - 1] + 1;
+                    dp[j] = prevDiagonal + 1;
                 } else {
-                    dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                    dp[j] = Math.max(dp[j], dp[j - 1]);
                 }
+                prevDiagonal = temp; // 更新左上角值
             }
         }
 
-        int lcs = dp[m][n];
-
-        // 使用Dice系数计算相似度：2 * |A∩B| / (|A| + |B|)
-        return (2.0 * lcs) / (m + n);
+        int lcs = dp[n];
+        return (2.0 * lcs) / (m + n); // Dice系数
     }
 
     public static void main(String[] args) {
         SourceCodeComparator comparator = new SourceCodeComparator();
-        ComparisonResult result = comparator.compareProjects(Paths.get("/Users/chenwenzhe/git/codediff")
-                , Paths.get("/Users/chenwenzhe/git/easy-ai"));
+        comparator.setProgressListener(new DefaultProgressListener());
+        ComparisonResult result = comparator.compareProjects(Paths.get("/Users/chenwenzhe/git/easy-ai")
+                , Paths.get("/Users/chenwenzhe/git/codediff"));
 
-        System.out.println(JSONObject.toJSONString(result.getDirectoryTree1()));
+        ResultReporter.report(result, System.out, true, false, true, false);
     }
 
 }

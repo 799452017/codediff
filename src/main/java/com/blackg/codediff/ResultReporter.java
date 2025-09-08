@@ -16,22 +16,27 @@ import java.util.List;
 public class ResultReporter {
     private static final int MAX_WIDTH = 100; // 控制台最大宽度
 
-    public static void report(ComparisonResult result, PrintStream out, boolean showTree, boolean showOnlyDiff, boolean showSideBySide) {
+    public static void report(ComparisonResult result
+            , PrintStream out
+            , boolean showTree
+            , boolean showOnlyDiff
+            , boolean showSideBySide
+            , boolean useColor) {
         // 输出统计摘要
         out.println("\n============ 源码对比结果摘要 ============");
-        out.printf("工程1文件总数: %d\n", result.getAllFiles1().size());
-        out.printf("工程2文件总数: %d\n", result.getAllFiles2().size());
-        out.printf("工程1文件大小: %d 字节\n", result.getFileSize1());
-        out.printf("工程2文件大小: %d 字节\n", result.getFileSize2());
-        out.printf("工程1代码行数: %d\n", result.getCodeCount1());
-        out.printf("工程2代码行数: %d\n", result.getCodeCount2());
-        out.println("----------------------------------------");
-        out.printf("完全匹配文件数: %d\n", result.getExactMatchCount());
-        out.printf("部分匹配文件数: %d\n", result.getDiffMatchCount());
-        out.printf("工程1未匹配文件数: %d\n", result.getUnmatchedCount1());
-        out.printf("工程2未匹配文件数: %d\n", result.getUnmatchedCount2());
-        out.println("----------------------------------------");
-        out.printf("整体相似度: %.2f%%\n", result.getSimilarityScore() * 100);
+        out.println("+--------------------------------+----------------+----------------+");
+        out.printf("| %-30s | %-14s | %-14s |\n", "指标项", result.getFileName1(), result.getFileName2());
+        out.println("+--------------------------------+----------------+----------------+");
+        out.printf("| %-30s | %,14d | %,14d |\n", "文件总数", result.getAllFiles1().size(), result.getAllFiles2().size());
+        out.printf("| %-30s | %,14d | %,14d |\n", "文件大小", result.getFileSize1(), result.getFileSize2());
+        out.printf("| %-30s | %,14d | %,14d |\n", "代码行数", result.getCodeCount1(), result.getCodeCount2());
+        out.println("+--------------------------------+----------------+----------------+");
+        out.printf("| %-30s | %,14d | %,14d |\n", "完全匹配文件数", result.getExactMatchCount(), result.getExactMatchCount());
+        out.printf("| %-30s | %,14d | %,14d |\n", "部分匹配文件数", result.getDiffMatchCount(), result.getDiffMatchCount());
+        out.printf("| %-30s | %,14d | %,14d |\n", "未匹配文件数", result.getUnmatchedCount1(), result.getUnmatchedCount2());
+        out.println("+--------------------------------+----------------+----------------+");
+        out.printf("| %-30s | %28.2f%% |\n", "整体相似度", result.getSimilarityScore() * 100);
+        out.println("+--------------------------------+----------------+----------------+");
 
         // 输出完全匹配文件
         if (!result.getExactMatches().isEmpty()) {
@@ -68,8 +73,8 @@ public class ResultReporter {
         // 添加树状结构展示
         if (result.getDirectoryTree1() != null && result.getDirectoryTree2() != null && showTree) {
             // 选项1：单独展示每个工程的结构
-            printProjectTree(result.getDirectoryTree1(), out, "工程1", showOnlyDiff);
-            printProjectTree(result.getDirectoryTree2(), out, "工程2", showOnlyDiff);
+//            printProjectTree(result.getDirectoryTree1(), out, "工程1", showOnlyDiff);
+//            printProjectTree(result.getDirectoryTree2(), out, "工程2", showOnlyDiff);
 
             if (showSideBySide) {
                 // 选项2：并排对比展示
@@ -77,7 +82,8 @@ public class ResultReporter {
                         result.getDirectoryTree1(),
                         result.getDirectoryTree2(),
                         out,
-                        showOnlyDiff
+                        showOnlyDiff,
+                        useColor
                 );
             }
         }
@@ -87,7 +93,8 @@ public class ResultReporter {
             TreeNode node,
             String prefix,
             PrintStream out,
-            boolean showOnlyDiff
+            boolean showOnlyDiff,
+            boolean useColor
     ) {
         if (node == null) return;
 
@@ -108,27 +115,8 @@ public class ResultReporter {
         }
 
         // 节点状态标识
-        String statusSymbol = "";
-        String statusColor = "";
-
-        if (node.getType() == NodeType.FILE) {
-            if (node.getFileMatch() != null) {
-                switch (node.getFileMatch().matchType) {
-                    case EXACT_MATCH:
-                        statusSymbol = "✓ ";
-                        statusColor = "\u001B[32m"; // 绿色
-                        break;
-                    case NAME_MATCH:
-                    case CONTENT_MATCH:
-                        statusSymbol = "Δ ";
-                        statusColor = "\u001B[33m"; // 黄色
-                        break;
-                }
-            } else {
-                statusSymbol = "✗ ";
-                statusColor = "\u001B[31m"; // 红色
-            }
-        }
+        String statusSymbol = getStatusSymbol(node);
+        String statusColor = useColor ? getStatusColor(node) : "";
 
         // 跳过不需要显示的节点
         boolean shouldDisplay = true;
@@ -154,7 +142,7 @@ public class ResultReporter {
 
         // 打印节点
         if (shouldDisplay) {
-            String resetColor = "\u001B[0m";
+            String resetColor = getResetColor();
             String nodeName = statusColor + statusSymbol + node.getName() + resetColor;
 
             if (node.getType() == NodeType.FILE && node.getFileMatch() != null) {
@@ -167,7 +155,7 @@ public class ResultReporter {
 
         // 递归打印子节点
         for (TreeNode child : node.getChildren().values()) {
-            printTree(child, childPrefix, out, showOnlyDiff);
+            printTree(child, childPrefix, out, showOnlyDiff, useColor);
         }
     }
 
@@ -178,10 +166,11 @@ public class ResultReporter {
             DirectoryTree tree,
             PrintStream out,
             String projectName,
-            boolean showOnlyDiff
+            boolean showOnlyDiff,
+            boolean useColor
     ) {
         out.println("\n============ " + projectName + " 工程结构 ============");
-        printTree(tree.getRoot(), "", out, showOnlyDiff);
+        printTree(tree.getRoot(), "", out, showOnlyDiff, useColor);
     }
 
     public static String repeat(String str, int count) {
@@ -200,7 +189,8 @@ public class ResultReporter {
             DirectoryTree tree1,
             DirectoryTree tree2,
             PrintStream out,
-            boolean showOnlyDiff
+            boolean showOnlyDiff,
+            boolean useColor
     ) {
         out.println("\n============ 工程结构对比 ============");
         out.println("工程 1" + repeat(" ", 45) + "工程 2");
@@ -212,8 +202,8 @@ public class ResultReporter {
         List<String> rightLines = new ArrayList<>();
 
         // 分别生成两棵树的文本表示
-        generateTreeLines(tree1.getRoot(), "", leftLines, showOnlyDiff);
-        generateTreeLines(tree2.getRoot(), "", rightLines, showOnlyDiff);
+        generateTreeLines(tree1.getRoot(), "", leftLines, showOnlyDiff, useColor);
+        generateTreeLines(tree2.getRoot(), "", rightLines, showOnlyDiff, useColor);
 
         // 确定最大行数
         int maxLines = Math.max(leftLines.size(), rightLines.size());
@@ -241,7 +231,8 @@ public class ResultReporter {
             TreeNode node,
             String prefix,
             List<String> lines,
-            boolean showOnlyDiff
+            boolean showOnlyDiff,
+            boolean useColor
     ) {
         if (node == null) return;
 
@@ -259,8 +250,8 @@ public class ResultReporter {
 
         // 节点状态标识
         String statusSymbol = getStatusSymbol(node);
-        String colorCode = getStatusColor(node);
-        String resetColor = "\u001B[0m";
+        String colorCode = useColor ? getStatusColor(node) : "";
+        String resetColor = useColor ? getResetColor() : "";
 
         // 构建节点行
         String nodeName = node.getName();
@@ -286,7 +277,7 @@ public class ResultReporter {
                 childPrefix = prefix + (isLast ? "    " : "│   ");
             }
 
-            generateTreeLines(child, childPrefix, lines, showOnlyDiff);
+            generateTreeLines(child, childPrefix, lines, showOnlyDiff, useColor);
         }
     }
 
@@ -350,17 +341,22 @@ public class ResultReporter {
         return "\u001B[31m"; // 红色
     }
 
+    private static String getResetColor() {
+        return "\u001B[0m";
+    }
+
     private static void printTreesSideBySide(
             TreeNode node1,
             TreeNode node2,
             String prefix1,
             String prefix2,
             PrintStream out,
-            boolean showOnlyDiff
+            boolean showOnlyDiff,
+            boolean useColor
     ) {
         // 确定节点显示
-        String line1 = formatTreeNode(node1, prefix1, showOnlyDiff);
-        String line2 = formatTreeNode(node2, prefix2, showOnlyDiff);
+        String line1 = formatTreeNode(node1, prefix1, showOnlyDiff, useColor);
+        String line2 = formatTreeNode(node2, prefix2, showOnlyDiff, useColor);
 
         if (line1 != null || line2 != null) {
             out.printf("%-50s%s%n",
@@ -384,11 +380,14 @@ public class ResultReporter {
             String childPrefix1 = prefix1 + (isLastChild(node1, i) ? "    " : "│   ");
             String childPrefix2 = prefix2 + (isLastChild(node2, i) ? "    " : "│   ");
 
-            printTreesSideBySide(child1, child2, childPrefix1, childPrefix2, out, showOnlyDiff);
+            printTreesSideBySide(child1, child2, childPrefix1, childPrefix2, out, showOnlyDiff, useColor);
         }
     }
 
-    private static String formatTreeNode(TreeNode node, String prefix, boolean showOnlyDiff) {
+    private static String formatTreeNode(TreeNode node
+            , String prefix
+            , boolean showOnlyDiff
+            , boolean useColor) {
         if (node == null) return null;
 
         // 跳过不需要显示的节点
@@ -420,29 +419,10 @@ public class ResultReporter {
         }
 
         // 节点状态标识
-        String statusSymbol = "";
-        String statusColor = "";
+        String statusSymbol = getStatusSymbol(node);
+        String statusColor = useColor ? getStatusColor(node) : "";
 
-        if (node.getType() == NodeType.FILE) {
-            if (node.getFileMatch() != null) {
-                switch (node.getFileMatch().matchType) {
-                    case EXACT_MATCH:
-                        statusSymbol = "✓ ";
-                        statusColor = "\u001B[32m"; // 绿色
-                        break;
-                    case NAME_MATCH:
-                    case CONTENT_MATCH:
-                        statusSymbol = "Δ ";
-                        statusColor = "\u001B[33m"; // 黄色
-                        break;
-                }
-            } else {
-                statusSymbol = "✗ ";
-                statusColor = "\u001B[31m"; // 红色
-            }
-        }
-
-        String resetColor = "\u001B[0m";
+        String resetColor = getResetColor();
         String nodeName = prefix + nodeSymbol + statusColor + statusSymbol + node.getName() + resetColor;
 
         // 添加相似度信息

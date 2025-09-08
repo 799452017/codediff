@@ -65,7 +65,7 @@ public class Main {
             ComparisonResult result = comparator.compareProjects(project1, project2);
 
             // 输出报告
-            ResultReporter.report(result, System.out, config.isShowTree(), config.isShowOnlyDiff(), config.isShowSideBySide());
+            ResultReporter.report(result, System.out, config.isShowTree(), config.isShowOnlyDiff(), config.isShowSideBySide(), true);
         } catch (Exception e) {
             System.err.println("对比过程中出错: " + e.getMessage());
             e.printStackTrace();
