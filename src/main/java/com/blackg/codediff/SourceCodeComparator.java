@@ -486,11 +486,6 @@ public class SourceCodeComparator {
                 contentStr = CommentRemover.removeComments(contentStr, filePath.getFileName().toString());
             }
             lines = Arrays.asList(contentStr.split("\\R"));
-
-            // 应用预处理（如果需要）
-            if (config.isIgnoreWhitespace() || config.isIgnoreCase()) {
-                lines = preprocessLines(lines);
-            }
         }
 
         File file1 = filePath.toFile();
@@ -635,6 +630,12 @@ public class SourceCodeComparator {
 
         List<String> lines1 = fileData1.lines;
         List<String> lines2 = fileData2.lines;
+        // 应用预处理（如果需要）
+        if (config.isIgnoreWhitespace() || config.isIgnoreCase()) {
+            lines1 = preprocessLines(lines1);
+            lines2 = preprocessLines(lines2);
+        }
+
         int m = lines1.size();
         int n = lines2.size();
 
@@ -674,10 +675,12 @@ public class SourceCodeComparator {
     public static void main(String[] args) {
         SourceCodeComparator comparator = new SourceCodeComparator();
         comparator.setProgressListener(new DefaultProgressListener());
-        ComparisonResult result = comparator.compareProjects(Paths.get("/Users/chenwenzhe/git/easy-ai")
-                , Paths.get("/Users/chenwenzhe/git/codediff"));
+        Path projectPath = Paths.get("C:\\Users\\Administrator\\IdeaProjects\\codediff");
+        List<FileData> fileData = comparator.collectFiles(projectPath);
+        DirectoryTree directoryTree = SourceCodeComparator.buildDirectoryTree(projectPath, fileData);
 
-        ResultReporter.report(result, System.out, true, false, true, false);
+        System.out.println();
+//        ResultReporter.report(result, System.out, true, false, true, false);
     }
 
 }

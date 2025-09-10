@@ -31,30 +31,42 @@ public class DirectoryTree {
     }
 
     /**
-     * 添加文件到树结构中
+     * 将文件添加到目录树结构中
+     *
+     * @param fileData 包含文件信息的FileData对象
      */
     public void addFile(FileData fileData) {
         Path filePath = Paths.get(fileData.getFilePath());
+        // 计算文件相对于基础路径的相对路径
         Path relativePath = basePath.relativize(filePath);
+        // 从根节点开始遍历
         TreeNode current = root;
 
-        // 遍历路径组件
+        // 遍历路径组件，逐级创建目录节点
         Path parentPath = basePath;
         for (Path component : relativePath) {
+            // 获取组件名称
             String name = component.toString();
+            // 检查当前节点是否已存在该子节点
             TreeNode child = current.getChild(name);
-
+            // 判断是否为目录节点（如果不是文件本身则为目录）
+            boolean isDir = component.toFile().isDirectory();
+            NodeType type = isDir ? NodeType.DIRECTORY : NodeType.FILE;
+            // 如果子节点不存在，则创建新节点
             if (child == null) {
-                parentPath = parentPath.resolve(name);
-                boolean isDir = filePath.toFile().isDirectory();
-                NodeType type = isDir ? NodeType.DIRECTORY : NodeType.FILE;
-
-                child = new TreeNode(name, type, parentPath.toString(), relativePath.toString(), fileData.getMd5());
+                // 构建当前节点的完整路径
+                Path resolve = parentPath.resolve(component);
+                // 构建当前节点相对路径
+                Path relativize = basePath.relativize(resolve);
+                // 创建新节点并添加到当前节点的子节点中
+                child = new TreeNode(name, resolve.toFile().isDirectory() ? NodeType.DIRECTORY : NodeType.FILE, resolve.toString(), relativize.toString(), fileData.getMd5());
                 child.setId(fileData.getId());
                 current.addChild(child);
             }
 
+            // 移动到下一个节点
             current = child;
+            // 更新父路径为当前节点的完整路径
             parentPath = Paths.get(current.getFullPath());
         }
 
@@ -63,6 +75,7 @@ public class DirectoryTree {
 //            current.setFileData(fileData);
 //        }
     }
+
 
     /**
      * 获取树中所有文件节点
