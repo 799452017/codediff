@@ -57,6 +57,7 @@ public class CommentRemover {
         public String removeComments(String source) {
             return new CommentProcessor(source)
                     .setLineComment("#")
+                    .setBlockComment("\"\"\"", "\"\"\"")
                     .setTripleQuotes(true)
                     .process();
         }
