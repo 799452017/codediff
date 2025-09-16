@@ -90,12 +90,12 @@ public class ComparisonResult {
 
     //获取工程1代码行数
     public int getCodeCount1() {
-        return getAllFiles1().stream().mapToInt(FileData::getLineCount).sum();
+        return getAllFiles1().stream().filter(f -> !f.isBinary).mapToInt(FileData::getLineCount).sum();
     }
 
     // 获取工程2代码行数
     public int getCodeCount2() {
-        return getAllFiles2().stream().mapToInt(FileData::getLineCount).sum();
+        return getAllFiles2().stream().filter(f -> !f.isBinary).mapToInt(FileData::getLineCount).sum();
     }
 
     public static String getFileSizeName(long fileSize) {
