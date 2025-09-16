@@ -98,7 +98,7 @@ public class ComparisonResult {
         return getAllFiles2().stream().mapToInt(FileData::getLineCount).sum();
     }
 
-    public static String getFileSizeName(long fileSize){
+    public static String getFileSizeName(long fileSize) {
         //根据大小返回KM, G
         if (fileSize < 1024) {
             return fileSize + "B";
@@ -112,10 +112,11 @@ public class ComparisonResult {
         return String.format("%.2fGB", fileSize / (1024.0 * 1024.0 * 1024.0));
     }
 
-    public String getFileSizeName1(){
+    public String getFileSizeName1() {
         return getFileSizeName(fileSize1);
     }
-    public String getFileSizeName2(){
+
+    public String getFileSizeName2() {
         return getFileSizeName(fileSize2);
     }
 

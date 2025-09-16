@@ -15,16 +15,16 @@ import java.util.Map;
 @Data
 public class TreeNode {
     private String id;
-    private final String name;
-    private final NodeType type;
+    private String name;
+    private NodeType type;
 //    @JsonIgnore //忽略jackson序列化
 //    @JSONField(serialize = false) //忽略fastjson序列化
-    private final String fullPath;
+    private String fullPath;
 //    @JsonIgnore //忽略jackson序列化
 //    @JSONField(serialize = false) //忽略fastjson序列化
-    private final String relativePath;
-    private final String md5;
-    private final Map<String, TreeNode> children = new HashMap<>();
+    private String relativePath;
+    private String md5;
+    private Map<String, TreeNode> children = new HashMap<>();
     @JsonIgnore //忽略jackson序列化
     @JSONField(serialize = false) //忽略fastjson序列化
     private TreeNode parent;

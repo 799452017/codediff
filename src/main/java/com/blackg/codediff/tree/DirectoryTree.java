@@ -36,7 +36,8 @@ public class DirectoryTree {
      * @param fileData 包含文件信息的FileData对象
      */
     public void addFile(FileData fileData) {
-        Path filePath = Paths.get(fileData.getFilePath());
+        String normalizedPath = fileData.getFilePath().replace('\\', '/');
+        Path filePath = Paths.get(normalizedPath).normalize();
         // 计算文件相对于基础路径的相对路径
         Path relativePath = basePath.relativize(filePath);
         // 从根节点开始遍历
@@ -49,9 +50,6 @@ public class DirectoryTree {
             String name = component.toString();
             // 检查当前节点是否已存在该子节点
             TreeNode child = current.getChild(name);
-            // 判断是否为目录节点（如果不是文件本身则为目录）
-            boolean isDir = component.toFile().isDirectory();
-            NodeType type = isDir ? NodeType.DIRECTORY : NodeType.FILE;
             // 如果子节点不存在，则创建新节点
             if (child == null) {
                 // 构建当前节点的完整路径

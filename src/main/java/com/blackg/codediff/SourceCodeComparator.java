@@ -1,5 +1,6 @@
 package com.blackg.codediff;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.io.FileUtil;
 import com.blackg.codediff.enums.MatchType;
 import com.blackg.codediff.listener.DefaultProgressListener;
@@ -213,39 +214,43 @@ public class SourceCodeComparator {
         //根据md5值分组
         Set<FileData> files1 = result.getUnmatched1();
         Set<FileData> files2 = result.getUnmatched2();
-        Map<String, FileData> md5Map1 = createMD5Map(files1);
-        Map<String, FileData> md5Map2 = createMD5Map(files2);
+        Map<String, List<FileData>> md5Map1 = createMD5Map(files1);
+        Map<String, List<FileData>> md5Map2 = createMD5Map(files2);
         int size = md5Map1.size();
 
         int matchCount = 0;
         int currentFile = 0;
         // 遍历所有MD5值，寻找匹配项
-        for (Map.Entry<String, FileData> entry : md5Map1.entrySet()) {
+        for (Map.Entry<String, List<FileData>> entry : md5Map1.entrySet()) {
             String md5 = entry.getKey();
-            FileData file1 = entry.getValue();
+            List<FileData> file1 = entry.getValue();
 
             double similarity = 0;
-            FileData file2 = md5Map2.get(md5);
-            if (file2 != null) {
-                similarity = 1.0;
-                // 创建匹配记录
-                FileMatch match = new FileMatch(file1, file2, MatchType.EXACT_MATCH, 1.0);
-                result.addExactMatch(match);
+            List<FileData> file2 = md5Map2.get(md5);
 
-                // 从未匹配集合中移除
-                files1.remove(file1);
-                result.getUnmatched2().remove(file2);
+            for (FileData fileData1 : file1) {
+                if (CollUtil.isNotEmpty(file2)) {
+                    for (FileData fileData2 : file2) {
+                        similarity = 1.0;
+                        // 创建匹配记录
+                        FileMatch match = new FileMatch(fileData1, fileData2, MatchType.EXACT_MATCH, 1.0);
+                        result.addExactMatch(match);
 
-                matchCount++;
+                        // 从未匹配集合中移除
+                        files1.remove(fileData1);
+                        result.getUnmatched2().remove(fileData2);
+
+                        matchCount++;
+
+                        // 通知文件处理进度
+                        currentFile++;
+                        notifyFileProgress(fileData1.getRelativePath() + " <> " + fileData2.getRelativePath(), currentFile, size, similarity);
+                    }
+                } else {
+                    notifyFileProgress(fileData1.getRelativePath(), currentFile, size, similarity);
+                }
             }
 
-            // 通知文件处理进度
-            currentFile++;
-            if (file2 != null) {
-                notifyFileProgress(file1.getRelativePath() + " <> " + file2.getRelativePath(), currentFile, size, similarity);
-            } else {
-                notifyFileProgress(file1.getRelativePath(), currentFile, size, similarity);
-            }
         }
 
         return matchCount;
@@ -287,7 +292,11 @@ public class SourceCodeComparator {
                 if (similarity >= config.getSimilarityThreshold()) {
                     // 创建匹配记录
                     FileMatch match = new FileMatch(file1, file2, MatchType.NAME_MATCH, similarity);
-                    result.addDiffMatch(match);
+                    if (similarity == 1.0) {
+                        result.addExactMatch(match);
+                    } else {
+                        result.addDiffMatch(match);
+                    }
                     result.getUnmatched2().remove(file2);
 
                     matched = true;
@@ -328,7 +337,11 @@ public class SourceCodeComparator {
                         bestMatch = new FileMatch(file1, file2, MatchType.CONTENT_MATCH, similarity);
                         //手动存一下匹配过得文件，不立刻移除，不然后续匹配无法进行
                         matched2.add(file2);
-                        result.addDiffMatch(bestMatch);
+                        if (similarity == 1.0) {
+                            result.addExactMatch(bestMatch);
+                        } else {
+                            result.addDiffMatch(bestMatch);
+                        }
 
                         matchCount++;
                     }
@@ -356,7 +369,7 @@ public class SourceCodeComparator {
      * 计算整体相似度得分
      */
     private void calculateOverallSimilarity() {
-        int identicalFiles = result.getExactMatches().size();
+        int identicalFiles = result.getExactMatchCount();
         double[] similarFilesScores = result.getDiffMatches().stream()
                 .mapToDouble(match -> match.similarity)
                 .toArray();
@@ -462,7 +475,7 @@ public class SourceCodeComparator {
     /**
      * 处理单个文件：计算MD5并读取内容
      */
-    private FileData processFile(Path filePath, Path projectPath) throws IOException, NoSuchAlgorithmException {
+    public FileData processFile(Path filePath, Path projectPath) throws IOException, NoSuchAlgorithmException {
         // 计算相对路径
         String relativePath = projectPath.relativize(filePath).toString();
 
@@ -486,6 +499,7 @@ public class SourceCodeComparator {
                 contentStr = CommentRemover.removeComments(contentStr, filePath.getFileName().toString());
             }
             lines = Arrays.asList(contentStr.split("\\R"));
+            lines = preprocessLines(lines);
         }
 
         File file1 = filePath.toFile();
@@ -531,18 +545,24 @@ public class SourceCodeComparator {
      * 行内容预处理
      */
     private List<String> preprocessLines(List<String> lines) {
-        List<String> processedLines = lines.stream()
-                .map(line -> {
+        List<String> processedLines = new ArrayList<>();
+        lines.stream()
+                .forEach(line -> {
                     String processed = line;
                     if (config.isIgnoreWhitespace()) {
                         processed = processed.replaceAll("\\s+", "");
                     }
+                    if (config.isIgnoreEmptyLines()) {
+                        //忽略空白行
+                        if (processed.isEmpty()) {
+                            return;
+                        }
+                    }
                     if (config.isIgnoreCase()) {
                         processed = processed.toLowerCase();
                     }
-                    return processed;
-                })
-                .collect(Collectors.toList());
+                    processedLines.add(processed);
+                });
 
         return processedLines;
     }
@@ -563,12 +583,18 @@ public class SourceCodeComparator {
     /**
      * 创建MD5到文件的映射
      */
-    private Map<String, FileData> createMD5Map(Set<FileData> files) {
+//    private Map<String, FileData> createMD5Map(Set<FileData> files) {
+//        return files.stream()
+//                .collect(Collectors.toMap(
+//                        f -> f.md5,
+//                        f -> f,
+//                        (existing, replacement) -> existing
+//                ));
+//    }
+    private Map<String, List<FileData>> createMD5Map(Set<FileData> files) {
         return files.stream()
-                .collect(Collectors.toMap(
-                        f -> f.md5,
-                        f -> f,
-                        (existing, replacement) -> existing
+                .collect(Collectors.groupingBy(
+                        f -> f.md5
                 ));
     }
 
@@ -620,7 +646,7 @@ public class SourceCodeComparator {
 //        // 使用Dice系数计算相似度：2 * |A∩B| / (|A| + |B|)
 //        return (2.0 * lcs) / (m + n);
 //    }
-    private double calculateSimilarity(FileData fileData1, FileData fileData2) {
+    public double calculateSimilarity(FileData fileData1, FileData fileData2) {
         if (fileData1.isBinary && fileData2.isBinary) {
             return fileData1.md5.equals(fileData2.md5) ? 1.0 : 0.0;
         }
@@ -630,11 +656,6 @@ public class SourceCodeComparator {
 
         List<String> lines1 = fileData1.lines;
         List<String> lines2 = fileData2.lines;
-        // 应用预处理（如果需要）
-        if (config.isIgnoreWhitespace() || config.isIgnoreCase()) {
-            lines1 = preprocessLines(lines1);
-            lines2 = preprocessLines(lines2);
-        }
 
         int m = lines1.size();
         int n = lines2.size();

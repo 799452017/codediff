@@ -12,6 +12,7 @@ import java.util.List;
 public class ComparatorConfig {
     private double similarityThreshold = 0.6;  // 相似度阈值
     private boolean ignoreWhitespace = true;  // 是否忽略空白字符
+    private boolean ignoreEmptyLines = false; //是否忽略空行
     private boolean ignoreCase = false;       // 是否忽略大小写
     private List<String> excludePatterns = new ArrayList<>(); // 排除文件模式
     private boolean ignoreComments = true; //是否忽略注释
