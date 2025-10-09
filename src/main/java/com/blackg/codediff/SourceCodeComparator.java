@@ -230,14 +230,14 @@ public class SourceCodeComparator {
 
             for (FileData fileData1 : file1) {
                 if (CollUtil.isNotEmpty(file2)) {
+                    // 从未匹配集合中移除
+                    files1.remove(fileData1);
                     for (FileData fileData2 : file2) {
                         similarity = 1.0;
                         // 创建匹配记录
                         FileMatch match = new FileMatch(fileData1, fileData2, MatchType.EXACT_MATCH, 1.0);
                         result.addExactMatch(match);
 
-                        // 从未匹配集合中移除
-                        files1.remove(fileData1);
                         result.getUnmatched2().remove(fileData2);
 
                         matchCount++;
